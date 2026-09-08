@@ -79,12 +79,19 @@ namespace LendTracking.Controllers
         }
 
         [HttpPost("google")]
-        [ProducesResponseType(typeof(AuthResult), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(AuthResult), StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<AuthResult>> Google([FromBody] GoogleSignInRequest request, CancellationToken ct)
+        public async Task<ActionResult<AuthResult>> Google(
+            [FromBody] GoogleSignInRequest request,
+            CancellationToken ct)
         {
-            var result = await _authService.SignInWithGoogleAsync(request.IdToken, ct);
-            return result.Success ? Ok(result) : Unauthorized(result);
+            try
+            {
+                var result = await _authService.SignInWithGoogleAsync(request.IdToken, ct);
+                return result.Success ? Ok(result) : Unauthorized(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.ToString());
+            }
         }
 
         [HttpGet("me")]
