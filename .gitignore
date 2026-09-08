@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+*.user
+
+# Local overrides that may contain real credentials.
+appsettings.*.local.json
+appsettings.Production.json
