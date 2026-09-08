@@ -1,8 +1,12 @@
 # Use the official Microsoft .NET SDK image to build the app
 FROM ://microsoft.com AS build
 WORKDIR /src
+
+# Copy your csproj and restore dependencies
 COPY ["LendTracking.csproj", "./"]
 RUN dotnet restore
+
+# Copy the rest of your code and build it
 COPY . .
 RUN dotnet publish -c Release -o /app/publish
 
