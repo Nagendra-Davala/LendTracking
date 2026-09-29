@@ -260,6 +260,65 @@ namespace LendTracking.Migrations
                     b.ToTable("group_members");
                 });
 
+            modelBuilder.Entity("LendTracking.Model.Entities.LendingPaymentEvent", b =>
+                {
+                    b.Property<int>("PaymentEventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("payment_event_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PaymentEventId"));
+
+                    b.Property<decimal?>("AmountPaid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount_paid");
+
+                    b.Property<bool>("ApplyHeldCredit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("apply_held_credit");
+
+                    b.Property<bool>("CapitalizeInterest")
+                        .HasColumnType("boolean")
+                        .HasColumnName("capitalize_interest");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("EventDate")
+                        .HasColumnType("date")
+                        .HasColumnName("event_date");
+
+                    b.Property<bool>("HoldExcessAsCredit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hold_excess_as_credit");
+
+                    b.Property<int>("LendingRecordId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lending_record_id");
+
+                    b.Property<DateOnly?>("NewProposedDate")
+                        .HasColumnType("date")
+                        .HasColumnName("new_proposed_date");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.HasKey("PaymentEventId");
+
+                    b.HasIndex("LendingRecordId");
+
+                    b.ToTable("lending_payment_events", t =>
+                        {
+                            t.HasCheckConstraint("ck_payment_event_amount_positive", "amount_paid IS NULL OR amount_paid > 0");
+
+                            t.HasCheckConstraint("ck_payment_event_has_content", "amount_paid IS NOT NULL OR new_proposed_date IS NOT NULL OR apply_held_credit OR capitalize_interest");
+                        });
+                });
+
             modelBuilder.Entity("LendTracking.Model.Entities.LendingRecord", b =>
                 {
                     b.Property<int>("LendingRecordId")
@@ -320,6 +379,10 @@ namespace LendTracking.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("principal");
 
+                    b.Property<DateOnly?>("ProposedReturnDate")
+                        .HasColumnType("date")
+                        .HasColumnName("proposed_return_date");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -344,6 +407,46 @@ namespace LendTracking.Migrations
 
                             t.HasCheckConstraint("ck_lending_rate_not_negative", "annual_rate_percent >= 0");
                         });
+                });
+
+            modelBuilder.Entity("LendTracking.Model.Entities.LendingShareLink", b =>
+                {
+                    b.Property<int>("ShareLinkId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("share_link_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ShareLinkId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<int>("LendingRecordId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lending_record_id");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.HasKey("ShareLinkId");
+
+                    b.HasIndex("LendingRecordId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("lending_share_links");
                 });
 
             modelBuilder.Entity("LendTracking.Model.Entities.PendingRegistration", b =>
@@ -525,6 +628,17 @@ namespace LendTracking.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("LendTracking.Model.Entities.LendingPaymentEvent", b =>
+                {
+                    b.HasOne("LendTracking.Model.Entities.LendingRecord", "LendingRecord")
+                        .WithMany("PaymentEvents")
+                        .HasForeignKey("LendingRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LendingRecord");
+                });
+
             modelBuilder.Entity("LendTracking.Model.Entities.LendingRecord", b =>
                 {
                     b.HasOne("LendTracking.Model.Entities.AppUser", "CounterpartyUser")
@@ -541,6 +655,17 @@ namespace LendTracking.Migrations
                     b.Navigation("CounterpartyUser");
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("LendTracking.Model.Entities.LendingShareLink", b =>
+                {
+                    b.HasOne("LendTracking.Model.Entities.LendingRecord", "LendingRecord")
+                        .WithMany("ShareLinks")
+                        .HasForeignKey("LendingRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LendingRecord");
                 });
 
             modelBuilder.Entity("LendTracking.Model.Entities.Settlement", b =>
@@ -589,6 +714,13 @@ namespace LendTracking.Migrations
             modelBuilder.Entity("LendTracking.Model.Entities.GroupExpense", b =>
                 {
                     b.Navigation("Shares");
+                });
+
+            modelBuilder.Entity("LendTracking.Model.Entities.LendingRecord", b =>
+                {
+                    b.Navigation("PaymentEvents");
+
+                    b.Navigation("ShareLinks");
                 });
 #pragma warning restore 612, 618
         }

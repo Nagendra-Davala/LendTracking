@@ -33,6 +33,10 @@ namespace LendTracking.Model.Entities
         [Column("given_date")]
         public DateOnly GivenDate { get; set; }
 
+        /// <summary>The repayment date the counterparty committed to when the money was given.</summary>
+        [Column("proposed_return_date")]
+        public DateOnly? ProposedReturnDate { get; set; }
+
         [Column("is_cleared")]
         public bool IsCleared { get; set; }
 
@@ -52,6 +56,8 @@ namespace LendTracking.Model.Entities
 
         public AppUser Owner { get; set; } = null!;
         public AppUser? CounterpartyUser { get; set; }
+        public ICollection<LendingPaymentEvent> PaymentEvents { get; set; } = new List<LendingPaymentEvent>();
+        public ICollection<LendingShareLink> ShareLinks { get; set; } = new List<LendingShareLink>();
     }
 
     public static class LendingDirection

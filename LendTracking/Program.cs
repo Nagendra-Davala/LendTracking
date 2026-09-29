@@ -32,6 +32,11 @@ builder.Services.AddDbContext<LendTrackingDbContext>(options =>
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LendingService>();
 builder.Services.AddScoped<SimpleInterestService>();
+builder.Services.AddSingleton<PendingActionStore>();
+builder.Services.AddScoped<AgentService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<SpeechService>();
+builder.Services.AddHostedService<SelfPingBackgroundService>();
 
 // Falls back to logging the link when Brevo is not configured.
 if (string.IsNullOrWhiteSpace(builder.Configuration["Email:Brevo:ApiKey"]))
@@ -119,6 +124,17 @@ app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// No auth, no CORS needed: this only exists for Render's own health checks and our
+// self-ping keep-alive to see as "recent traffic" — never called by the frontend.
+// Touches the database (not just the web process) so Neon's own auto-suspend never
+// kicks in either — otherwise the first real query after Neon idles out (e.g. Google
+// sign-in) pays that resume latency instead of this background ping.
+app.MapGet("/api/health", async (LendTrackingDbContext db) =>
+{
+    await db.Database.CanConnectAsync();
+    return Results.Ok(new { status = "ok", utc = DateTime.UtcNow });
+});
 
 app.MapControllers();
 

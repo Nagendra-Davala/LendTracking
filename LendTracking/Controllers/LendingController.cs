@@ -71,5 +71,64 @@ namespace LendTracking.Controllers
 
             return await _lendingService.DeleteAsync(userId, id, ct) ? NoContent() : NotFound();
         }
+
+        [HttpGet("{id:int}/events")]
+        public async Task<IActionResult> GetEvents(int id, CancellationToken ct)
+        {
+            if (CurrentUserId is not { } userId) return Unauthorized();
+
+            var ledger = await _lendingService.GetLedgerAsync(userId, id, ct);
+            return ledger is null ? NotFound() : Ok(ledger);
+        }
+
+        [HttpPost("{id:int}/events")]
+        public async Task<IActionResult> AddEvent(int id, [FromBody] AddPaymentEventRequest request, CancellationToken ct)
+        {
+            if (CurrentUserId is not { } userId) return Unauthorized();
+
+            try
+            {
+                var ledger = await _lendingService.AddPaymentEventAsync(userId, id, request, ct);
+                return ledger is null ? NotFound() : Ok(ledger);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{id:int}/events/{eventId:int}")]
+        public async Task<IActionResult> DeleteEvent(int id, int eventId, CancellationToken ct)
+        {
+            if (CurrentUserId is not { } userId) return Unauthorized();
+
+            return await _lendingService.DeleteEventAsync(userId, id, eventId, ct) ? NoContent() : NotFound();
+        }
+
+        [HttpGet("{id:int}/share")]
+        public async Task<IActionResult> GetShareLink(int id, CancellationToken ct)
+        {
+            if (CurrentUserId is not { } userId) return Unauthorized();
+
+            var link = await _lendingService.GetActiveShareLinkAsync(userId, id, ct);
+            return link is null ? NotFound() : Ok(link);
+        }
+
+        [HttpPost("{id:int}/share")]
+        public async Task<IActionResult> CreateShareLink(int id, [FromBody] CreateShareLinkRequest request, CancellationToken ct)
+        {
+            if (CurrentUserId is not { } userId) return Unauthorized();
+
+            var link = await _lendingService.CreateOrUpdateShareLinkAsync(userId, id, request, ct);
+            return link is null ? NotFound() : Ok(link);
+        }
+
+        [HttpDelete("{id:int}/share")]
+        public async Task<IActionResult> RevokeShareLink(int id, CancellationToken ct)
+        {
+            if (CurrentUserId is not { } userId) return Unauthorized();
+
+            return await _lendingService.RevokeShareLinkAsync(userId, id, ct) ? NoContent() : NotFound();
+        }
     }
 }

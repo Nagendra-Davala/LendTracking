@@ -9,6 +9,8 @@ namespace LendTracking.Data
 
         public DbSet<AppUser> Users => Set<AppUser>();
         public DbSet<LendingRecord> LendingRecords => Set<LendingRecord>();
+        public DbSet<LendingPaymentEvent> LendingPaymentEvents => Set<LendingPaymentEvent>();
+        public DbSet<LendingShareLink> LendingShareLinks => Set<LendingShareLink>();
         public DbSet<ExpenseGroup> Groups => Set<ExpenseGroup>();
         public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
         public DbSet<GroupExpense> Expenses => Set<GroupExpense>();
@@ -66,6 +68,35 @@ namespace LendTracking.Data
                     t.HasCheckConstraint("ck_lending_cleared_date", "cleared_date IS NULL OR cleared_date >= given_date");
                     t.HasCheckConstraint("ck_lending_cleared_flag", "(is_cleared AND cleared_date IS NOT NULL) OR (NOT is_cleared AND cleared_date IS NULL)");
                 });
+            });
+
+            b.Entity<LendingPaymentEvent>(e =>
+            {
+                e.HasKey(x => x.PaymentEventId);
+                e.Property(x => x.AmountPaid).HasPrecision(18, 2);
+                e.HasOne(x => x.LendingRecord)
+                 .WithMany(r => r.PaymentEvents)
+                 .HasForeignKey(x => x.LendingRecordId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(x => x.LendingRecordId);
+                e.ToTable(t =>
+                {
+                    t.HasCheckConstraint("ck_payment_event_has_content",
+                        "amount_paid IS NOT NULL OR new_proposed_date IS NOT NULL OR apply_held_credit OR capitalize_interest");
+                    t.HasCheckConstraint("ck_payment_event_amount_positive", "amount_paid IS NULL OR amount_paid > 0");
+                });
+            });
+
+            b.Entity<LendingShareLink>(e =>
+            {
+                e.HasKey(x => x.ShareLinkId);
+                e.Property(x => x.Token).IsRequired();
+                e.HasIndex(x => x.Token).IsUnique();
+                e.HasOne(x => x.LendingRecord)
+                 .WithMany(r => r.ShareLinks)
+                 .HasForeignKey(x => x.LendingRecordId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(x => x.LendingRecordId);
             });
 
             b.Entity<ExpenseGroup>(e =>
