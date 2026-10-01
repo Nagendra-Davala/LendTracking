@@ -120,6 +120,7 @@ namespace LendTracking.Services
                         DisplayName = string.IsNullOrWhiteSpace(payload.Name) ? email.Split('@')[0] : payload.Name,
                         Email = email,
                         GoogleSubjectId = payload.Subject,
+                        ProfilePictureUrl = payload.Picture,
                         PasswordHash = null,
                         CreatedAt = DateTime.UtcNow,
                         IsActive = true
@@ -135,9 +136,11 @@ namespace LendTracking.Services
                     user.PasswordHash ??= pending.PasswordHash;
                     _db.PendingRegistrations.Remove(pending);
                 }
-
-                await _db.SaveChangesAsync(ct);
             }
+
+            // Google's picture URL can change between sign-ins, so keep it fresh on every sign-in.
+            user.ProfilePictureUrl = payload.Picture;
+            await _db.SaveChangesAsync(ct);
 
             if (!user.IsActive)
             {
@@ -296,6 +299,7 @@ namespace LendTracking.Services
                 UserName = user.UserName,
                 DisplayName = user.DisplayName,
                 Email = user.Email,
+                ProfilePictureUrl = user.ProfilePictureUrl,
                 Token = token,
                 TokenExpiresAt = expiresAt
             };

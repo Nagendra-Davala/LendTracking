@@ -71,6 +71,12 @@ namespace LendTracking.Model.Lending
         public DateOnly? ClearedDate { get; set; }
         public string? Notes { get; set; }
 
+        /// <summary>True once any payment event has been logged. Direction can't change after this; editing Amount/Rate/Given date still can, but recalculates the whole history.</summary>
+        public bool HasEvents { get; set; }
+
+        /// <summary>The earliest logged event's date, if any — Given date can never be moved later than this.</summary>
+        public DateOnly? EarliestEventDate { get; set; }
+
         /// <summary>What's actually left after any partial payments (Principal minus principal paid off so far).</summary>
         public decimal OutstandingPrincipal { get; set; }
 
@@ -180,6 +186,12 @@ namespace LendTracking.Model.Lending
         public decimal OutstandingPrincipal { get; set; }
         public DateOnly InterestFromDate { get; set; }
         public decimal InterestToDate { get; set; }
+
+        /// <summary>Unpaid interest that already existed going into the InterestFromDate checkpoint — not newly accrued since then.</summary>
+        public decimal CarriedUnpaidInterest { get; set; }
+
+        /// <summary>Interest accrued fresh since InterestFromDate, on top of CarriedUnpaidInterest. Together they add up to InterestToDate.</summary>
+        public decimal NewInterestSinceFrom { get; set; }
         public decimal TotalToDate { get; set; }
         public DateOnly? CurrentProposedDate { get; set; }
 
@@ -240,6 +252,8 @@ namespace LendTracking.Model.Lending
         public DateOnly? LastPaidDate { get; set; }
         public DateOnly InterestFromDate { get; set; }
         public decimal InterestToDate { get; set; }
+        public decimal CarriedUnpaidInterest { get; set; }
+        public decimal NewInterestSinceFrom { get; set; }
         public decimal TotalToDate { get; set; }
         public decimal HeldCredit { get; set; }
         public DateTime? ExpiresAt { get; set; }

@@ -29,6 +29,10 @@ namespace LendTracking.Model.Entities
         [MaxLength(64)]
         public string? GoogleSubjectId { get; set; }
 
+        [Column("profile_picture_url")]
+        [MaxLength(500)]
+        public string? ProfilePictureUrl { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

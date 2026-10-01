@@ -75,6 +75,30 @@ namespace LendTracking.Services
             var record = await FindOwnedAsync(userId, id, ct);
             if (record is null) return null;
 
+            var hasEvents = record.PaymentEvents.Count > 0;
+
+            // Flipping Lent/Borrowed after real activity has been logged doesn't correspond to any
+            // real correction — every existing event's meaning would invert with it. If it was
+            // entered backwards from day one, delete and recreate instead.
+            if (hasEvents && request.Direction != record.Direction)
+            {
+                throw new ArgumentException(
+                    "Direction can't be changed once payments or other activity have been logged on this record.");
+            }
+
+            // Amount/Rate/Given date can still be corrected after activity exists (typos happen) —
+            // the frontend warns that this recalculates the whole history. But the given date can
+            // never move past an event that already happened under it, or that event becomes invalid.
+            if (hasEvents)
+            {
+                var earliestEventDate = record.PaymentEvents.Min(e => e.EventDate);
+                if (request.GivenDate > earliestEventDate)
+                {
+                    throw new ArgumentException(
+                        $"The given date can't be moved later than the earliest logged event ({earliestEventDate:d MMM yyyy}).");
+                }
+            }
+
             record.CounterpartyName = request.CounterpartyName.Trim();
             record.CounterpartyUserId = request.CounterpartyUserId;
             record.Direction = request.Direction;
@@ -259,6 +283,8 @@ namespace LendTracking.Services
                 LastPaidDate = record.PaymentEvents.Where(e => e.AmountPaid != null).Select(e => (DateOnly?)e.EventDate).Max(),
                 InterestFromDate = ledger.InterestFromDate,
                 InterestToDate = ledger.InterestToDate,
+                CarriedUnpaidInterest = ledger.CarriedUnpaidInterest,
+                NewInterestSinceFrom = ledger.NewInterestSinceFrom,
                 TotalToDate = ledger.TotalToDate,
                 HeldCredit = ledger.HeldCredit,
                 ExpiresAt = link.ExpiresAt,
@@ -305,6 +331,8 @@ namespace LendTracking.Services
                 IsCleared = r.IsCleared,
                 ClearedDate = r.ClearedDate,
                 Notes = r.Notes,
+                HasEvents = r.PaymentEvents.Count > 0,
+                EarliestEventDate = r.PaymentEvents.Select(e => (DateOnly?)e.EventDate).Min(),
                 OutstandingPrincipal = ledger.OutstandingPrincipal,
                 LastPaidDate = r.PaymentEvents.Where(e => e.AmountPaid != null).Select(e => (DateOnly?)e.EventDate).Max(),
                 InterestFromDate = ledger.InterestFromDate,
@@ -350,6 +378,8 @@ namespace LendTracking.Services
                 OutstandingPrincipal = ledger.OutstandingPrincipal,
                 InterestFromDate = ledger.InterestFromDate,
                 InterestToDate = ledger.InterestToDate,
+                CarriedUnpaidInterest = ledger.CarriedUnpaidInterest,
+                NewInterestSinceFrom = ledger.NewInterestSinceFrom,
                 TotalToDate = ledger.TotalToDate,
                 CurrentProposedDate = ledger.CurrentProposedDate,
                 HeldCredit = ledger.HeldCredit,
@@ -364,6 +394,8 @@ namespace LendTracking.Services
             DateOnly? CurrentProposedDate,
             decimal HeldCredit,
             DateOnly InterestFromDate,
+            decimal CarriedUnpaidInterest,
+            decimal NewInterestSinceFrom,
             List<LedgerEntryResponse> Entries);
 
         /// <summary>
@@ -470,7 +502,12 @@ namespace LendTracking.Services
             var finalDays = DaysBetween(cursor, end);
             // No automatic credit consumption here — held credit stays exactly what it was after
             // the last logged event until a new ApplyHeldCredit event or settlement changes it.
-            var finalInterestOwed = carriedInterest + (principal * r.AnnualRatePercent * finalDays / 365m / 100m);
+            // Split in two for display: what was already owed going into this checkpoint (carried
+            // forward, unpaid) versus what's accrued fresh since then — a single blended figure
+            // next to "Interest From" misleadingly implied the whole amount started from that date.
+            var carriedUnpaidInterest = carriedInterest;
+            var newInterestSinceFrom = principal * r.AnnualRatePercent * finalDays / 365m / 100m;
+            var finalInterestOwed = carriedUnpaidInterest + newInterestSinceFrom;
 
             var total = principal + finalInterestOwed;
 
@@ -489,6 +526,8 @@ namespace LendTracking.Services
                 currentProposedDate,
                 Math.Round(heldCredit, 2),
                 cursor,
+                Math.Round(carriedUnpaidInterest, 2),
+                Math.Round(newInterestSinceFrom, 2),
                 entries);
         }
 

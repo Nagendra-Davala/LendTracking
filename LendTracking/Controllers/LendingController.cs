@@ -51,8 +51,15 @@ namespace LendTracking.Controllers
         {
             if (CurrentUserId is not { } userId) return Unauthorized();
 
-            var updated = await _lendingService.UpdateAsync(userId, id, request, ct);
-            return updated is null ? NotFound() : Ok(updated);
+            try
+            {
+                var updated = await _lendingService.UpdateAsync(userId, id, request, ct);
+                return updated is null ? NotFound() : Ok(updated);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPatch("{id:int}/cleared")]

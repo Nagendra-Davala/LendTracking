@@ -61,6 +61,11 @@ namespace LendTracking.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("ProfilePictureUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("profile_picture_url");
+
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(50)

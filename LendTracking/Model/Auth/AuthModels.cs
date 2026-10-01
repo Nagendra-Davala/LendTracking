@@ -34,6 +34,7 @@ namespace LendTracking.Model.Auth
         public string UserName { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string? Email { get; set; }
+        public string? ProfilePictureUrl { get; set; }
         public string Token { get; set; } = string.Empty;
         public DateTime TokenExpiresAt { get; set; }
     }
