@@ -1,9 +1,11 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using LendTracking.Data;
 using LendTracking.Model.Auth;
 using LendTracking.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -31,6 +33,7 @@ builder.Services.AddDbContext<LendTrackingDbContext>(options =>
 
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LendingService>();
+builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<SimpleInterestService>();
 builder.Services.AddSingleton<PendingActionStore>();
 builder.Services.AddScoped<AgentService>();
@@ -68,6 +71,31 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+// Shared across signup/signin/resend-verification/forgot-password/reset-password: unauthenticated
+// endpoints with no other identity to key on, so partition by caller IP. Keyed by IP *and* path so
+// each endpoint gets its own independent budget — otherwise normal back-and-forth testing across
+// several of these in a row (sign in, resend, forgot-password) would exhaust one shared pool.
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("AuthLimiter", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"{httpContext.Connection.RemoteIpAddress}:{httpContext.Request.Path}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+            }));
+
+    options.OnRejected = (context, ct) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        return new ValueTask(context.HttpContext.Response.WriteAsJsonAsync(
+            new { success = false, message = "Too many attempts. Please wait a few minutes and try again." },
+            ct));
+    };
+});
 
 builder.Services.AddControllers();
 
@@ -124,6 +152,7 @@ app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // No auth, no CORS needed: this only exists for Render's own health checks and our
 // self-ping keep-alive to see as "recent traffic" — never called by the frontend.

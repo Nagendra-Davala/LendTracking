@@ -3,6 +3,7 @@ using LendTracking.Model.Auth;
 using LendTracking.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LendTracking.Controllers
 {
@@ -26,6 +27,7 @@ namespace LendTracking.Controllers
                     AuthResult.Fail("Email and password sign-in is currently unavailable. Please continue with Google."));
 
         [HttpPost("signup")]
+        [EnableRateLimiting("AuthLimiter")]
         [ProducesResponseType(typeof(AuthResult), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(AuthResult), StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<AuthResult>> SignUp([FromBody] SignUpRequest request, CancellationToken ct)
@@ -39,6 +41,7 @@ namespace LendTracking.Controllers
         }
 
         [HttpPost("signin")]
+        [EnableRateLimiting("AuthLimiter")]
         [ProducesResponseType(typeof(AuthResult), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(AuthResult), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(AuthResult), StatusCodes.Status403Forbidden)]
@@ -70,12 +73,49 @@ namespace LendTracking.Controllers
         }
 
         [HttpPost("resend-verification")]
+        [EnableRateLimiting("AuthLimiter")]
         [ProducesResponseType(typeof(AuthResult), StatusCodes.Status200OK)]
         public async Task<ActionResult<AuthResult>> ResendVerification([FromBody] ResendVerificationRequest request, CancellationToken ct)
         {
             if (PasswordAuthDisabled() is { } blocked) return blocked;
 
             return Ok(await _authService.ResendVerificationAsync(request.Email, ct));
+        }
+
+        [HttpPost("forgot-password")]
+        [EnableRateLimiting("AuthLimiter")]
+        [ProducesResponseType(typeof(AuthResult), StatusCodes.Status200OK)]
+        public async Task<ActionResult<AuthResult>> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
+        {
+            if (PasswordAuthDisabled() is { } blocked) return blocked;
+
+            return Ok(await _authService.ForgotPasswordAsync(request.Email, ct));
+        }
+
+        [HttpPost("reset-password")]
+        [EnableRateLimiting("AuthLimiter")]
+        [ProducesResponseType(typeof(AuthResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(AuthResult), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<AuthResult>> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken ct)
+        {
+            if (PasswordAuthDisabled() is { } blocked) return blocked;
+
+            var result = await _authService.ResetPasswordAsync(request.Token, request.NewPassword, ct);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpPost("change-password")]
+        [Authorize]
+        [EnableRateLimiting("AuthLimiter")]
+        [ProducesResponseType(typeof(AuthResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(AuthResult), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<AuthResult>> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
+        {
+            var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+
+            var result = await _authService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword, ct);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpPost("google")]

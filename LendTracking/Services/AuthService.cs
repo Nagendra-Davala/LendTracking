@@ -30,6 +30,9 @@ namespace LendTracking.Services
         private TimeSpan VerificationTokenLifetime =>
             TimeSpan.FromMinutes(_config.GetValue("Auth:VerificationLinkMinutes", 1440));
 
+        private TimeSpan PasswordResetTokenLifetime =>
+            TimeSpan.FromMinutes(_config.GetValue("Auth:PasswordResetLinkMinutes", 60));
+
         public async Task<AuthResult> SignUpAsync(SignUpRequest request, CancellationToken ct = default)
         {
             // Stored lower-cased so the unique indexes enforce case-insensitive identity.
@@ -298,6 +301,97 @@ namespace LendTracking.Services
                 displayName,
                 $"{appBaseUrl}/verify-email?token={Uri.EscapeDataString(rawToken)}",
                 ct);
+        }
+
+        public async Task<AuthResult> ForgotPasswordAsync(string rawEmail, CancellationToken ct = default)
+        {
+            var email = rawEmail.Trim().ToLowerInvariant();
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive, ct);
+
+            if (user is not null)
+            {
+                var appBaseUrl = _config["App:BaseUrl"]?.TrimEnd('/')
+                    ?? throw new InvalidOperationException("App:BaseUrl is not configured.");
+
+                try
+                {
+                    if (user.PasswordHash is null)
+                    {
+                        // Google-only account — nothing to reset, but let the real owner know
+                        // rather than silently doing nothing (safe: only they receive this).
+                        await _emailSender.SendGoogleOnlyAccountNoticeAsync(email, user.DisplayName, ct);
+                    }
+                    else
+                    {
+                        var rawToken = NewToken();
+                        user.PasswordResetTokenHash = HashToken(rawToken);
+                        user.PasswordResetExpiresAt = DateTime.UtcNow.Add(PasswordResetTokenLifetime);
+                        await _db.SaveChangesAsync(ct);
+
+                        await _emailSender.SendPasswordResetEmailAsync(
+                            email,
+                            user.DisplayName,
+                            $"{appBaseUrl}/reset-password?token={Uri.EscapeDataString(rawToken)}",
+                            ct);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "Could not send the password reset email to {Email}.", email);
+                    return AuthResult.Fail(
+                        "Couldn't send the email. Please make sure you've entered a valid, active email address, then try again shortly.");
+                }
+            }
+
+            // Always the same reply, so this cannot be used to discover registered addresses.
+            return AuthResult.Notice("If that address has an account, we've sent instructions to reset the password.");
+        }
+
+        public async Task<AuthResult> ResetPasswordAsync(string rawToken, string newPassword, CancellationToken ct = default)
+        {
+            var hash = HashToken(rawToken);
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.PasswordResetTokenHash == hash, ct);
+
+            if (user is null)
+            {
+                return AuthResult.Fail("This reset link is no longer valid. Request a new one below.");
+            }
+
+            if (user.PasswordResetExpiresAt is null || user.PasswordResetExpiresAt < DateTime.UtcNow)
+            {
+                return AuthResult.Fail("This reset link has expired. Request a new one below.");
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            user.PasswordResetTokenHash = null;
+            user.PasswordResetExpiresAt = null;
+            await _db.SaveChangesAsync(ct);
+
+            return AuthResult.Notice("Your password has been reset. You can now sign in with it.");
+        }
+
+        public async Task<AuthResult> ChangePasswordAsync(int userId, string currentPassword, string newPassword, CancellationToken ct = default)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.UserId == userId && u.IsActive, ct);
+            if (user is null)
+            {
+                return AuthResult.Fail("Account not found.");
+            }
+
+            if (user.PasswordHash is null)
+            {
+                return AuthResult.Fail("This account signs in with Google and has no password to change.");
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+            {
+                return AuthResult.Fail("Your current password is incorrect.");
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            await _db.SaveChangesAsync(ct);
+
+            return AuthResult.Notice("Your password has been changed.");
         }
 
         private static string NewToken() => Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));

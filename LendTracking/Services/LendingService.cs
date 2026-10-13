@@ -168,6 +168,12 @@ namespace LendTracking.Services
                 throw new ArgumentException("The event date can't be before the record's given date.");
             }
 
+            if (record.ClearedDate is { } clearedDate && request.EventDate > clearedDate)
+            {
+                throw new ArgumentException(
+                    $"This record was settled on {clearedDate:d MMM yyyy} — the event date can't be after that.");
+            }
+
             _db.LendingPaymentEvents.Add(new LendingPaymentEvent
             {
                 LendingRecordId = record.LendingRecordId,
@@ -338,7 +344,6 @@ namespace LendTracking.Services
                 InterestFromDate = ledger.InterestFromDate,
                 InterestToDate = ledger.InterestToDate,
                 TotalToDate = ledger.TotalToDate,
-                DaysElapsed = days,
                 ProjectedInterestByProposedDate = FlatInterest(r, ledger.CurrentProposedDate),
                 GrossInterestToDate = FlatInterest(r.Principal, r.AnnualRatePercent, days),
                 AmountPaidToDate = ledger.Entries.Sum(e => e.AmountPaid ?? 0m),

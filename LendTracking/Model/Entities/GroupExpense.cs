@@ -39,5 +39,6 @@ namespace LendTracking.Model.Entities
         public ExpenseGroup Group { get; set; } = null!;
         public AppUser PaidBy { get; set; } = null!;
         public ICollection<ExpenseShare> Shares { get; set; } = new List<ExpenseShare>();
+        public ICollection<ExpenseComment> Comments { get; set; } = new List<ExpenseComment>();
     }
 }

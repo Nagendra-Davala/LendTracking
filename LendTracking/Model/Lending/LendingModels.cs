@@ -89,7 +89,6 @@ namespace LendTracking.Model.Lending
         /// <summary>Ledger-based: accrued on the outstanding balance to today, or frozen at the cleared date.</summary>
         public decimal InterestToDate { get; set; }
         public decimal TotalToDate { get; set; }
-        public int DaysElapsed { get; set; }
 
         /// <summary>Projected interest if settled exactly on ProposedReturnDate, given payments so far. Null if no proposed date.</summary>
         public decimal? ProjectedInterestByProposedDate { get; set; }

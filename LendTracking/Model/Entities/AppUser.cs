@@ -33,6 +33,13 @@ namespace LendTracking.Model.Entities
         [MaxLength(500)]
         public string? ProfilePictureUrl { get; set; }
 
+        [Column("password_reset_token_hash")]
+        [MaxLength(64)]
+        public string? PasswordResetTokenHash { get; set; }
+
+        [Column("password_reset_expires_at")]
+        public DateTime? PasswordResetExpiresAt { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

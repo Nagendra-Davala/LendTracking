@@ -61,6 +61,15 @@ namespace LendTracking.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_hash");
 
+                    b.Property<DateTime?>("PasswordResetExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("password_reset_expires_at");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("password_reset_token_hash");
+
                     b.Property<string>("ProfilePictureUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -84,6 +93,42 @@ namespace LendTracking.Migrations
                         .IsUnique();
 
                     b.ToTable("users");
+                });
+
+            modelBuilder.Entity("LendTracking.Model.Entities.ExpenseComment", b =>
+                {
+                    b.Property<int>("CommentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("comment_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("CommentId"));
+
+                    b.Property<string>("CommentText")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("comment_text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("ExpenseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("expense_id");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("CommentId");
+
+                    b.HasIndex("ExpenseId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("expense_comments");
                 });
 
             modelBuilder.Entity("LendTracking.Model.Entities.ExpenseGroup", b =>
@@ -565,6 +610,25 @@ namespace LendTracking.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LendTracking.Model.Entities.ExpenseComment", b =>
+                {
+                    b.HasOne("LendTracking.Model.Entities.GroupExpense", "Expense")
+                        .WithMany("Comments")
+                        .HasForeignKey("ExpenseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LendTracking.Model.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Expense");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("LendTracking.Model.Entities.ExpenseGroup", b =>
                 {
                     b.HasOne("LendTracking.Model.Entities.AppUser", "CreatedBy")
@@ -718,6 +782,8 @@ namespace LendTracking.Migrations
 
             modelBuilder.Entity("LendTracking.Model.Entities.GroupExpense", b =>
                 {
+                    b.Navigation("Comments");
+
                     b.Navigation("Shares");
                 });
 

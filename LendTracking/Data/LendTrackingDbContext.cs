@@ -15,6 +15,7 @@ namespace LendTracking.Data
         public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
         public DbSet<GroupExpense> Expenses => Set<GroupExpense>();
         public DbSet<ExpenseShare> ExpenseShares => Set<ExpenseShare>();
+        public DbSet<ExpenseComment> ExpenseComments => Set<ExpenseComment>();
         public DbSet<Settlement> Settlements => Set<Settlement>();
         public DbSet<PendingRegistration> PendingRegistrations => Set<PendingRegistration>();
 
@@ -162,6 +163,20 @@ namespace LendTracking.Data
                     t.HasCheckConstraint("ck_share_amount_not_negative", "share_amount >= 0");
                     t.HasCheckConstraint("ck_share_percent_range", "share_percent IS NULL OR (share_percent >= 0 AND share_percent <= 100)");
                 });
+            });
+
+            b.Entity<ExpenseComment>(e =>
+            {
+                e.HasKey(x => x.CommentId);
+                e.HasOne(x => x.Expense)
+                 .WithMany(x => x.Comments)
+                 .HasForeignKey(x => x.ExpenseId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.User)
+                 .WithMany()
+                 .HasForeignKey(x => x.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.ExpenseId);
             });
 
             b.Entity<Settlement>(e =>
