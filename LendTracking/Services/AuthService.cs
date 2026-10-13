@@ -67,7 +67,16 @@ namespace LendTracking.Services
                 return AuthResult.Fail("A confirmation link was already sent to that address. Please check your inbox.");
             }
 
-            await SendVerificationLinkAsync(email, pending.DisplayName, rawToken, ct);
+            try
+            {
+                await SendVerificationLinkAsync(email, pending.DisplayName, rawToken, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Could not send the confirmation email to {Email}.", email);
+                return AuthResult.Fail(
+                    "Couldn't send the confirmation email. Please make sure you've entered a valid, active email address, then use \"Send it again\" in a moment.");
+            }
 
             return AuthResult.PendingVerification(
                 $"Almost there. We sent a confirmation link to {email}. Your account is created once you click it.");
@@ -263,7 +272,16 @@ namespace LendTracking.Services
                 pending.ExpiresAt = DateTime.UtcNow.Add(VerificationTokenLifetime);
                 await _db.SaveChangesAsync(ct);
 
-                await SendVerificationLinkAsync(email, pending.DisplayName, rawToken, ct);
+                try
+                {
+                    await SendVerificationLinkAsync(email, pending.DisplayName, rawToken, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "Could not send the confirmation email to {Email}.", email);
+                    return AuthResult.Fail(
+                        "Couldn't send the email. Please make sure you've entered a valid, active email address, then try again shortly.");
+                }
             }
 
             // Always the same reply, so this cannot be used to discover registered addresses.
