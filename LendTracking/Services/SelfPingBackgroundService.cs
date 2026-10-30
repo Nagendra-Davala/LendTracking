@@ -23,7 +23,7 @@ namespace LendTracking.Services
             _env = env;
             _logger = logger;
             _url = config["SelfPing:Url"];
-            _interval = TimeSpan.FromMinutes(config.GetValue("SelfPing:IntervalMinutes", 13));
+            _interval = TimeSpan.FromDays(config.GetValue("SelfPing:IntervalMinutes", 30));
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
